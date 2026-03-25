@@ -58,26 +58,32 @@
             .attr("width", width)
             .attr("height", height);
 
+        // Grupo isolado para a cena de batalha — só ele recebe o zoom
+        const sceneGroup = svg.append("g").attr("id", "scene");
+
         // A barra de HP do oponente e do jogador tem 200 pixels de largura máxima
         const hpScaleOpponent = d3.scaleLinear().domain([0, battleData.opponent.maxHp]).range([0, 200]);
         const hpScalePlayer = d3.scaleLinear().domain([0, battleData.player.maxHp]).range([0, 200]);
         
         // Base Oval no chão (Oponente)
-        svg.append("ellipse").attr("cx", 700).attr("cy", 240).attr("rx", 180).attr("ry", 50).attr("fill", "#d0d0b8");
+        sceneGroup.append("ellipse").attr("cx", 700).attr("cy", 240).attr("rx", 180).attr("ry", 50).attr("fill", "#d0d0b8");
         // Base Oval no chão (Jogador)
-        svg.append("ellipse").attr("cx", 260).attr("cy", 460).attr("rx", 220).attr("ry", 70).attr("fill", "#d0d0b8");
+        sceneGroup.append("ellipse").attr("cx", 260).attr("cy", 460).attr("rx", 220).attr("ry", 70).attr("fill", "#d0d0b8");
 
         // Sprite Oponente
-        const opponentImage = svg.append("image")
+        const opponentImage = sceneGroup.append("image")
             .attr("href", battleData.opponent.sprite)
             .attr("x", 600).attr("y", 50)
             .attr("width", 200).attr("height", 200);
 
+        // Camada para animações de ataque (fica acima dos sprites)
+        const attackLayer = sceneGroup.append("g").attr("id", "attack-layer");
+
         // Sprite Jogador
-        svg.append("image")
+        sceneGroup.append("image")
         .attr("href", battleData.player.sprite)
-        .attr("x", 70) 
-        .attr("y", 230) 
+        .attr("x", 70)
+        .attr("y", 230)
         .attr("height", 250);
 
         // CAIXAS DE STATUS (Oponente)
@@ -87,7 +93,7 @@
         oppStatus.append("text").attr("class", "text-dark").attr("x", 260).attr("y", 40).text("Lv" + battleData.opponent.level);
         // Barra de HP Oponente
         oppStatus.append("rect").attr("class", "hp-bar-bg").attr("x", 100).attr("y", 56).attr("width", 208).attr("height", 16);
-        oppStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 104).attr("y", 60).attr("width", hpScaleOpponent(battleData.opponent.hp)).attr("height", 8);
+        const opponentHpBar = oppStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 104).attr("y", 60).attr("width", hpScaleOpponent(battleData.opponent.hp)).attr("height", 8);
 
         // CAIXAS DE STATUS (Jogador)
         const playerStatus = svg.append("g").attr("transform", "translate(520, 280)");
@@ -119,11 +125,97 @@
             { x: 320, y: menuY + 120 }
         ];
 
+        // Lock para impedir cliques durante animação
+        let isBattling = false;
+
         // Criando a Seta de Seleção
         const cursorArrow = svg.append("polygon")
         .attr("points", "0,0 24,12 0,24")
         .attr("fill", "#303030")
         .style("opacity", 0)
+
+        // Zoom 1.25x centrado no meio da arena (cx=435, cy=265)
+        // translate(cx*(1-s), cy*(1-s)) scale(s)
+        const zoomNormal = { tx: 0,    ty: 0,   s: 1    };
+        const zoomIn     = { tx: -109, ty: -66, s: 1.25 };
+
+        function animateSceneZoom(from, to, duration, ease) {
+            const i = d3.interpolate(from, to);
+            sceneGroup.transition("zoom").duration(duration).ease(ease)
+                .attrTween("transform", () => t => {
+                    const v = i(t);
+                    return `translate(${v.tx},${v.ty}) scale(${v.s})`;
+                });
+        }
+
+        // Função do ataque Vine Whip
+        function vineWhipAttack() {
+            if (isBattling || battleData.opponent.hp <= 0) return;
+            isBattling = true;
+
+            // Zoom in ao iniciar o ataque
+            animateSceneZoom(zoomNormal, zoomIn, 400, d3.easeCubicOut);
+
+            const startX = 215, startY = 330;
+            const endX = 700,   endY = 170;
+
+            function whipPath(t, retracting) {
+                const tipX = retracting ? endX + (startX - endX) * t : startX + (endX - startX) * t;
+                const tipY = retracting ? endY + (startY - endY) * t : startY + (endY - startY) * t;
+                const arcHeight = (retracting ? 80 : 140) * Math.sin(t * Math.PI);
+                const cp1x = startX + (tipX - startX) * 0.3;
+                const cp1y = startY + (tipY - startY) * 0.3 - arcHeight * 1.2;
+                const cp2x = startX + (tipX - startX) * 0.7;
+                const cp2y = startY + (tipY - startY) * 0.7 - arcHeight * 0.5;
+                return `M ${startX},${startY} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${tipX},${tipY}`;
+            }
+
+            const vine = attackLayer.append("path")
+                .attr("fill", "none").attr("stroke", "#3a8c28").attr("stroke-width", 10)
+                .attr("stroke-linecap", "round").attr("filter", "drop-shadow(0 0 4px #78c840)")
+                .attr("d", whipPath(0, false));
+
+            const vineInner = attackLayer.append("path")
+                .attr("fill", "none").attr("stroke", "#78c840").attr("stroke-width", 4)
+                .attr("stroke-linecap", "round").attr("d", whipPath(0, false));
+
+            // Chamado quando o cipó acerta o Squirtle
+            function onHit() {
+                flashOpponent();
+                const damage = Math.floor(Math.random() * 10) + 15;
+                battleData.opponent.hp = Math.max(0, battleData.opponent.hp - damage);
+                // Transições nomeadas: correm em paralelo sem se interromperem
+                opponentHpBar.transition("width").duration(400)
+                    .attr("width", hpScaleOpponent(battleData.opponent.hp));
+                const hpPercent = battleData.opponent.hp / battleData.opponent.maxHp;
+                const barColor = hpPercent < 0.2 ? "#e83030" : hpPercent < 0.5 ? "#f0b828" : "#48d0b0";
+                opponentHpBar.transition("color").delay(100).duration(300).attr("fill", barColor);
+            }
+
+            // Garante que isBattling sempre volta a false (end OU interrupt)
+            function cleanup() {
+                if (!isBattling) return;
+                vine.remove();
+                vineInner.remove();
+                isBattling = false;
+                // Zoom out ao fim do ataque
+                animateSceneZoom(zoomIn, zoomNormal, 400, d3.easeCubicIn);
+            }
+
+            // Fase 1 — extensão, encadeada com fase 2 — retração
+            vine.transition().duration(480).ease(d3.easeLinear)
+                .attrTween("d", () => t => whipPath(t, false))
+                .transition().delay(200).duration(380).ease(d3.easeLinear)
+                .attrTween("d", () => t => whipPath(t, true))
+                .on("end", cleanup).on("interrupt", cleanup);
+
+            vineInner.transition().duration(480).ease(d3.easeLinear)
+                .attrTween("d", () => t => whipPath(t, false))
+                .on("end", onHit)   // dispara dano exatamente quando o cipó toca o Squirtle
+                .transition().delay(200).duration(380).ease(d3.easeLinear)
+                .attrTween("d", () => t => whipPath(t, true))
+                .on("end", cleanup).on("interrupt", cleanup);
+        }
 
         // Função para fazer o oponente piscar em vermelho
         function flashOpponent() {
@@ -176,8 +268,11 @@
     })
     // Quando clica em um golpe
     .on("click", function(event, d) {
-        // Faz o oponente piscar em vermelho
-        flashOpponent();
+        if (d === "VINE WHIP") {
+            vineWhipAttack();
+        } else {
+            if (!isBattling) flashOpponent();
+        }
     });
 
     </script>
