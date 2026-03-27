@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -20,166 +19,230 @@
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             border-radius: 4px;
         }
-        .box-bg { fill: #f8f8d8; stroke: #405048; stroke-width: 6px; rx: 12px; }
-        .menu-bg { fill: #f8f8f8; stroke: #505068; stroke-width: 12px; rx: 8px; }
-        .text-dark { fill: #303030; font-weight: bold; font-size: 24px; }
-        .text-small { fill: #303030; font-size: 24px; font-weight: bold; }
-        .hp-bar-bg { fill: #484048; rx: 4px; }
-        .hp-bar-fill { fill: #48d0b0; rx: 4px; }
-        .move-text { cursor: pointer; fill: #303030; font-weight: bold; font-size: 36px; }
+        .box-bg      { fill: #f8f8d8; stroke: #405048; stroke-width: 6px; }
+        .menu-bg     { fill: #f8f8f8; stroke: #505068; stroke-width: 12px; }
+        .text-dark   { fill: #303030; font-weight: bold; font-size: 24px; }
+        .text-small  { fill: #303030; font-size: 24px; font-weight: bold; }
+        .hp-bar-bg   { fill: #484048; }
+        .hp-bar-fill { fill: #48d0b0; }
+        .move-text   { cursor: pointer; fill: #303030; font-weight: bold; font-size: 36px; }
         .move-text:hover { fill: #d04040; }
     </style>
 </head>
 <body>
 
-    <div id="game-container"></div>
+<div id="game-container"></div>
 
-    <script>
-        // O ESTADO DO JOGO (Os Dados)
-        const battleData = {
-            opponent: {
-                name: "SQUIRTLE", level: 26, hp: 70, maxHp: 100,
-                sprite: "https://www.pngall.com/wp-content/uploads/15/Squirtle-PNG-Image-File.png"
-            },
-            player: {
-                name: "BULBASAUR", level: 24, hp: 52, maxHp: 52,
-                // Link atualizado e estável para o sprite de costas
-                sprite: "https://art.pixilart.com/7e8988e96886ddd.png"
-            },
-            moves: ["VINE WHIP", "RAZOR LEAF", "GROWL", "TACKLE"]
-        };
-            
-        // CONFIGURAÇÃO DO CANVAS
-        const width = 960;
-        const height = 640;
+<script>
+    const battleData = {
+        opponent: {
+            name: "SQUIRTLE", level: 26, hp: 70, maxHp: 100,
+            sprite: "https://www.pngall.com/wp-content/uploads/15/Squirtle-PNG-Image-File.png"
+        },
+        player: {
+            name: "BULBASAUR", level: 24, hp: 52, maxHp: 52,
+            sprite: "https://art.pixilart.com/7e8988e96886ddd.png"
+        },
+        moves: ["VINE WHIP", "RAZOR LEAF", "GROWL", "TACKLE"]
+    };
 
-        const svg = d3.select("#game-container")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
+    const width  = 960;
+    const height = 640;
 
-        // A barra de HP do oponente e do jogador tem 200 pixels de largura máxima
-        const hpScaleOpponent = d3.scaleLinear().domain([0, battleData.opponent.maxHp]).range([0, 200]);
-        const hpScalePlayer = d3.scaleLinear().domain([0, battleData.player.maxHp]).range([0, 200]);
-        
-        // Base Oval no chão (Oponente)
-        svg.append("ellipse").attr("cx", 700).attr("cy", 240).attr("rx", 180).attr("ry", 50).attr("fill", "#d0d0b8");
-        // Base Oval no chão (Jogador)
-        svg.append("ellipse").attr("cx", 260).attr("cy", 460).attr("rx", 220).attr("ry", 70).attr("fill", "#d0d0b8");
+    const svg = d3.select("#game-container")
+        .append("svg")
+        .attr("width",  width)
+        .attr("height", height);
 
-        // Sprite Oponente
-        const opponentImage = svg.append("image")
-            .attr("href", battleData.opponent.sprite)
-            .attr("x", 600).attr("y", 50)
-            .attr("width", 200).attr("height", 200);
+    const hpScaleOpponent = d3.scaleLinear().domain([0, battleData.opponent.maxHp]).range([0, 200]);
+    const hpScalePlayer   = d3.scaleLinear().domain([0, battleData.player.maxHp]).range([0, 200]);
 
-        // Sprite Jogador
-        svg.append("image")
-        .attr("href", battleData.player.sprite)
-        .attr("x", 70) 
-        .attr("y", 230) 
+    svg.append("ellipse").attr("cx", 700).attr("cy", 240).attr("rx", 180).attr("ry",  50).attr("fill", "#d0d0b8");
+    svg.append("ellipse").attr("cx", 260).attr("cy", 460).attr("rx", 220).attr("ry",  70).attr("fill", "#d0d0b8");
+
+    const opponentImage = svg.append("image")
+        .attr("href",   battleData.opponent.sprite)
+        .attr("x",      600).attr("y",  50)
+        .attr("width",  200).attr("height", 200);
+
+    svg.append("image")
+        .attr("href",   battleData.player.sprite)
+        .attr("x",       70).attr("y", 230)
         .attr("height", 250);
 
-        // CAIXAS DE STATUS (Oponente)
-        const oppStatus = svg.append("g").attr("transform", "translate(40, 60)");
-        oppStatus.append("rect").attr("class", "box-bg").attr("width", 360).attr("height", 90);
-        oppStatus.append("text").attr("class", "text-dark").attr("x", 20).attr("y", 40).text(battleData.opponent.name);
-        oppStatus.append("text").attr("class", "text-dark").attr("x", 260).attr("y", 40).text("Lv" + battleData.opponent.level);
-        // Barra de HP Oponente
-        oppStatus.append("rect").attr("class", "hp-bar-bg").attr("x", 100).attr("y", 56).attr("width", 208).attr("height", 16);
-        oppStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 104).attr("y", 60).attr("width", hpScaleOpponent(battleData.opponent.hp)).attr("height", 8);
+    const oppStatus = svg.append("g").attr("transform", "translate(40, 60)");
+    oppStatus.append("rect").attr("class", "box-bg").attr("width", 360).attr("height", 90);
+    oppStatus.append("text").attr("class", "text-dark").attr("x",  20).attr("y", 40).text(battleData.opponent.name);
+    oppStatus.append("text").attr("class", "text-dark").attr("x", 260).attr("y", 40).text("Lv" + battleData.opponent.level);
+    oppStatus.append("rect").attr("class", "hp-bar-bg").attr("x", 100).attr("y", 56).attr("width", 208).attr("height", 16);
+    oppStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 104).attr("y", 60).attr("width", hpScaleOpponent(battleData.opponent.hp)).attr("height", 8);
 
-        // CAIXAS DE STATUS (Jogador)
-        const playerStatus = svg.append("g").attr("transform", "translate(520, 280)");
-        playerStatus.append("rect").attr("class", "box-bg").attr("width", 380).attr("height", 130);
-        playerStatus.append("text").attr("class", "text-dark").attr("x", 20).attr("y", 40).text(battleData.player.name);
-        playerStatus.append("text").attr("class", "text-dark").attr("x", 280).attr("y", 40).text("Lv" + battleData.player.level);
-        // Barra de HP Jogador
-        playerStatus.append("rect").attr("class", "hp-bar-bg").attr("x", 120).attr("y", 56).attr("width", 208).attr("height", 16);
-        playerStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 124).attr("y", 60).attr("width", hpScalePlayer(battleData.player.hp)).attr("height", 8);
-        playerStatus.append("text").attr("class", "text-small").attr("x", 200).attr("y", 100).text(`${battleData.player.hp} / ${battleData.player.maxHp}`);
+    const playerStatus = svg.append("g").attr("transform", "translate(520, 280)");
+    playerStatus.append("rect").attr("class", "box-bg").attr("width", 380).attr("height", 130);
+    playerStatus.append("text").attr("class", "text-dark").attr("x",  20).attr("y", 40).text(battleData.player.name);
+    playerStatus.append("text").attr("class", "text-dark").attr("x", 280).attr("y", 40).text("Lv" + battleData.player.level);
+    playerStatus.append("rect").attr("class", "hp-bar-bg").attr("x", 120).attr("y", 56).attr("width", 208).attr("height", 16);
+    playerStatus.append("rect").attr("class", "hp-bar-fill").attr("x", 124).attr("y", 60).attr("width", hpScalePlayer(battleData.player.hp)).attr("height", 8);
+    playerStatus.append("text").attr("class", "text-small").attr("x", 200).attr("y", 100).text(`${battleData.player.hp} / ${battleData.player.maxHp}`);
 
-        // MENU INFERIOR
-        const menuY = 480;
-        // Caixa de Golpes
-        svg.append("rect").attr("class", "menu-bg").attr("x", 10).attr("y", menuY).attr("width", 600).attr("height", 150);
-        // Caixa de PP/Tipo
-        svg.append("rect").attr("class", "menu-bg").attr("x", 620).attr("y", menuY).attr("width", 330).attr("height", 150);
-        
-        // Textos PP e Tipo
-        svg.append("text").attr("class", "text-dark").attr("x", 650).attr("y", menuY + 60).text("PP");
-        svg.append("text").attr("class", "text-dark").attr("x", 790).attr("y", menuY + 60).text("25/25");
-        svg.append("text").attr("class", "text-dark").attr("x", 650).attr("y", menuY + 120).text("TIPO/PLANTA");
+    const menuY = 480;
+    svg.append("rect").attr("class", "menu-bg").attr("x",  10).attr("y", menuY).attr("width", 600).attr("height", 150);
+    svg.append("rect").attr("class", "menu-bg").attr("x", 620).attr("y", menuY).attr("width", 330).attr("height", 150);
+    svg.append("text").attr("class", "text-dark").attr("x", 650).attr("y", menuY +  60).text("PP");
+    svg.append("text").attr("class", "text-dark").attr("x", 790).attr("y", menuY +  60).text("25/25");
+    svg.append("text").attr("class", "text-dark").attr("x", 650).attr("y", menuY + 120).text("TIPO/PLANTA");
 
-        // Mapeando a array de golpes para posições na tela
-        const movePositions = [
-            { x: 60, y: menuY + 60 },  
-            { x: 320, y: menuY + 60 }, 
-            { x: 60, y: menuY + 120 }, 
-            { x: 320, y: menuY + 120 }
-        ];
+    const movePositions = [
+        { x:  60, y: menuY +  60 },
+        { x: 320, y: menuY +  60 },
+        { x:  60, y: menuY + 120 },
+        { x: 320, y: menuY + 120 }
+    ];
 
-        // Criando a Seta de Seleção
-        const cursorArrow = svg.append("polygon")
+    const cursorArrow = svg.append("polygon")
         .attr("points", "0,0 24,12 0,24")
         .attr("fill", "#303030")
-        .style("opacity", 0)
+        .style("opacity", 0);
 
-        // Função para fazer o oponente piscar em vermelho
-        function flashOpponent() {
-            opponentImage
-                .style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
-                .transition()
-                .duration(100)
-                .style("filter", "drop-shadow(0 0 0px #ff0000) brightness(1)")
-                .transition()
-                .duration(100)
-                .style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
-                .transition()
-                .duration(100)
-                .style("filter", "drop-shadow(0 0 0px #ff0000) brightness(1)")
-                .transition()
-                .duration(100)
-                .style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
-                .transition()
-                .duration(100)
-                .style("filter", "none");
-        }
+    // =========================================================
+    // RAZOR LEAF — ANIMAÇÃO
+    // =========================================================
 
-        // Vinculando os dados aos textos
-        svg.selectAll(".move-text")
-            .data(battleData.moves)
-            .enter()
-            .append("text")
-            .attr("class", "move-text")
-            .attr("x", (d, i) => movePositions[i].x)
-            .attr("y", (d, i) => movePositions[i].y)
-            .text(d => d)
+    const leavesG = svg.append("g").attr("id", "leaves");
 
-            .on("mouseover", function(event, d) {
-        // Encontra qual é o índice (0 a 3) do golpe que o mouse está em cima
-        const i = battleData.moves.indexOf(d);
-        
-        // Calcula a posição da seta (um pouco para a esquerda e para cima do texto)
-        const targetX = movePositions[i].x - 40; 
-        const targetY = movePositions[i].y - 24; 
+    let animating = false;
 
-        // Move a seta e deixa ela visível
-        cursorArrow
-            .attr("transform", `translate(${targetX}, ${targetY})`)
-            .style("opacity", 1);
-    })
-    // Quando o mouse SAI da área do golpe
-    .on("mouseout", function() {
-        // Esconde a seta
-        cursorArrow.style("opacity", 0);
-    })
-    // Quando clica em um golpe
-    .on("click", function(event, d) {
-        // Faz o oponente piscar em vermelho
-        flashOpponent();
-    });
+    const leafConfigs = [
+        { angle: -30, delay:   0, color: "#4cb84c", spin:  160 },
+        { angle: -18, delay:  80, color: "#3da03d", spin: -175 },
+        { angle:  -6, delay: 160, color: "#58cc58", spin:  150 },
+        { angle:   6, delay:  70, color: "#48b848", spin: -160 },
+        { angle:  18, delay: 120, color: "#3da03d", spin:  170 },
+        { angle:  28, delay:  40, color: "#4cb84c", spin: -165 },
+        { angle: -10, delay: 200, color: "#58cc58", spin:  145 },
+        { angle:  10, delay: 220, color: "#48b848", spin: -155 },
+    ];
 
-    </script>
+    function criarFolha(g, color) {
+        // rx e ry maiores para folha maior
+        g.append("ellipse")
+            .attr("rx", 22).attr("ry", 10)
+            .attr("fill", color)
+            .attr("stroke", d3.color(color).darker(0.8))
+            .attr("stroke-width", 1.2);
+
+        g.append("line")
+            .attr("x1", -20).attr("y1", 0)
+            .attr("x2",  20).attr("y2", 0)
+            .attr("stroke", d3.color(color).darker(1))
+            .attr("stroke-width", 1.2);
+
+        [[-10, -6], [-3, -8], [5, -6]].forEach(([x, y]) => {
+            g.append("line")
+                .attr("x1", x).attr("y1", 0).attr("x2", x + 5).attr("y2",  y)
+                .attr("stroke", d3.color(color).darker(0.8)).attr("stroke-width", 0.9);
+            g.append("line")
+                .attr("x1", x).attr("y1", 0).attr("x2", x + 5).attr("y2", -y)
+                .attr("stroke", d3.color(color).darker(0.8)).attr("stroke-width", 0.9);
+        });
+    }
+
+    function fireRazorLeaf() {
+        if (animating) return;
+        animating = true;
+
+        leavesG.selectAll("*").remove();
+
+        // Origem na frente do Bulbasaur (boca/bulbo virado para o oponente)
+        const xStart = 360, yStart = 290;
+        const xEnd   = 680, yEnd   = 130;
+
+        leafConfigs.forEach(cfg => {
+            setTimeout(() => {
+                const g = leavesG.append("g");
+                criarFolha(g, cfg.color);
+
+                const initRot = Math.random() * 60 - 30;
+                g.attr("transform", `translate(${xStart}, ${yStart}) rotate(${initRot})`);
+                g.attr("opacity", 0);
+
+                const tx  = xEnd + (Math.random() * 30 - 15);
+                const ty  = yEnd + (Math.random() * 20 - 10);
+
+                // Duração maior para voo mais lento
+                const dur = 700 + Math.random() * 100;
+
+                g.transition()
+                    .duration(100)
+                    .attr("opacity", 1)
+
+                    .transition()
+                    .duration(dur)
+                    .ease(d3.easeLinear)
+                    .tween("leafFly", function() {
+                        const ix = d3.interpolate(xStart, tx);
+                        const iy = d3.interpolate(yStart, ty);
+                        const ir = d3.interpolate(initRot, initRot + cfg.spin);
+                        return function(t) {
+                            d3.select(this).attr(
+                                "transform",
+                                `translate(${ix(t)}, ${iy(t)}) rotate(${ir(t)})`
+                            );
+                        };
+                    })
+
+                    .transition()
+                    .duration(150)
+                    .attr("opacity", 0)
+                    .on("end", function() { d3.select(this).remove(); });
+
+            }, cfg.delay);
+        });
+
+        // Flash do oponente sincronizado com a chegada das folhas
+        setTimeout(() => {
+            flashOpponent();
+        }, 900);
+
+        setTimeout(() => { animating = false; }, 1200);
+    }
+
+    // =========================================================
+
+    function flashOpponent() {
+        opponentImage
+            .style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
+            .transition().duration(100).style("filter", "drop-shadow(0 0 0px #ff0000) brightness(1)")
+            .transition().duration(100).style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
+            .transition().duration(100).style("filter", "drop-shadow(0 0 0px #ff0000) brightness(1)")
+            .transition().duration(100).style("filter", "drop-shadow(0 0 8px #ff0000) brightness(1.5)")
+            .transition().duration(100).style("filter", "none");
+    }
+
+    svg.selectAll(".move-text")
+        .data(battleData.moves)
+        .enter()
+        .append("text")
+        .attr("class", "move-text")
+        .attr("x", (d, i) => movePositions[i].x)
+        .attr("y", (d, i) => movePositions[i].y)
+        .text(d => d)
+        .on("mouseover", function(event, d) {
+            const i = battleData.moves.indexOf(d);
+            cursorArrow
+                .attr("transform", `translate(${movePositions[i].x - 40}, ${movePositions[i].y - 24})`)
+                .style("opacity", 1);
+        })
+        .on("mouseout", function() {
+            cursorArrow.style("opacity", 0);
+        })
+        .on("click", function(event, d) {
+            if (d === "RAZOR LEAF") {
+                fireRazorLeaf();
+            } else {
+                flashOpponent();
+            }
+        });
+</script>
 </body>
 </html>
